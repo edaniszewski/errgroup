@@ -17,6 +17,8 @@ type member struct {
 // Group to terminate.
 type Group struct {
 	members []*member
+
+	onError func(err error)
 }
 
 // Add a new member to the Group.
@@ -27,6 +29,14 @@ type Group struct {
 // after the routine has returned.
 func (g *Group) Add(routine func() error, terminate func(error)) {
 	g.members = append(g.members, &member{routine, terminate})
+}
+
+// OnError registers an error handler with the Group.
+//
+// The error handler is optional and is run prior to terminating members of the
+// group. It can be used for things like logging out the trapped error.
+func (g *Group) OnError(handler func(err error)) {
+	g.onError = handler
 }
 
 // Run the routines of all Group members concurrently.
@@ -66,6 +76,12 @@ func (g *Group) Run() error {
 		if terminated == cap(errors) {
 			break
 		}
+	}
+
+	// If an error handler is specified and there is an error,
+	// execute the handler function.
+	if err != nil && g.onError != nil {
+		g.onError(err)
 	}
 
 	// Terminate all group members.

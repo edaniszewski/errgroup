@@ -132,3 +132,46 @@ func ExampleGroup_Run_signals() {
 	// server stopped
 	// error: terminated on SIGHUP
 }
+
+func ExampleGroup_Run_withErrorHandler() {
+	var g Group
+
+	// Add a member which immediately returns nil.
+	g.Add(
+		func() error {
+			fmt.Println("member 1: returning nil immediately")
+			return nil
+		},
+		func(e error) {
+			fmt.Println("member 1: terminating")
+		},
+	)
+
+	// Add a member which errors after a short wait.
+	g.Add(
+		func() error {
+			time.Sleep(500 * time.Millisecond)
+			fmt.Println("member 2: erroring after 500ms")
+			return errors.New("tearing down")
+		},
+		func(e error) {
+			fmt.Println("member 2: terminating")
+		},
+	)
+
+	// Register an error handler which is called prior to
+	// terminating all members.
+	g.OnError(func(err error) {
+		fmt.Printf("on error: %v\n", err)
+	})
+
+	err := g.Run()
+	fmt.Printf("error: %s\n", err)
+	// Output:
+	// member 1: returning nil immediately
+	// member 2: erroring after 500ms
+	// on error: tearing down
+	// member 1: terminating
+	// member 2: terminating
+	// error: tearing down
+}

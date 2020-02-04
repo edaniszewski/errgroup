@@ -2,6 +2,7 @@ package errgroup
 
 import (
 	"errors"
+	"log"
 	"testing"
 	"time"
 )
@@ -21,6 +22,21 @@ func TestGroup_Add(t *testing.T) {
 
 	if len(g.members) != 1 {
 		t.Errorf("no members added")
+	}
+}
+
+func TestGroup_OnError(t *testing.T) {
+	var g Group
+	if g.onError != nil {
+		t.Error("error handler set, but not expected")
+	}
+
+	g.OnError(func(err error) {
+		log.Print(err)
+	})
+
+	if g.onError == nil {
+		t.Error("error handler not set, but expected")
 	}
 }
 
@@ -45,6 +61,7 @@ func TestGroup_RunEmpty(t *testing.T) {
 func TestGroup_RunOneNil(t *testing.T) {
 	var calledRoutine bool
 	var calledTerminate bool
+	var calledErrHandler bool
 
 	var g Group
 	g.Add(
@@ -56,6 +73,9 @@ func TestGroup_RunOneNil(t *testing.T) {
 			calledTerminate = true
 		},
 	)
+	g.OnError(func(err error) {
+		calledErrHandler = true
+	})
 
 	res := make(chan error)
 	defer close(res)
@@ -75,6 +95,9 @@ func TestGroup_RunOneNil(t *testing.T) {
 		if !calledTerminate {
 			t.Error("terminate not called")
 		}
+		if calledErrHandler {
+			t.Error("error handler called, but not expected")
+		}
 	case <-time.After(100 * time.Millisecond):
 		t.Error("test case timeout")
 	}
@@ -83,6 +106,7 @@ func TestGroup_RunOneNil(t *testing.T) {
 func TestGroup_RunOneError(t *testing.T) {
 	var calledRoutine bool
 	var calledTerminate bool
+	var calledErrHandler bool
 
 	var g Group
 	g.Add(
@@ -94,6 +118,9 @@ func TestGroup_RunOneError(t *testing.T) {
 			calledTerminate = true
 		},
 	)
+	g.OnError(func(err error) {
+		calledErrHandler = true
+	})
 
 	res := make(chan error)
 	defer close(res)
@@ -112,6 +139,9 @@ func TestGroup_RunOneError(t *testing.T) {
 		}
 		if !calledTerminate {
 			t.Error("terminate not called")
+		}
+		if !calledErrHandler {
+			t.Error("error handler not called, but expected")
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Error("test case timeout")
